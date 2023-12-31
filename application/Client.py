@@ -5,21 +5,22 @@ from PyQt6.QtCore import QThread, pyqtSignal
 import sys, socket, threading, json, re, time
 global b
 server_host = "127.0.0.1"  # Adresse IP du serveur
-server_port = 12345
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect((server_host, server_port))
+server_port = 12345 # Port utiliser
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Création d'un socket client avec IPv4 et TCP
+client_socket.connect((server_host, server_port)) #Connection au sereur en utilisant la socket client.
 b=0
 
 class PageInscription(QWidget):
     global b
     global client_socket, server_host, server_port
     def __init__(self, client_socket):
+        """Dans cette partie nous plaçons les différents éléments sur la page d'inscription"""
         super().__init__()
         self.setWindowTitle('Inscription') # Titre de la page
         self.setGeometry(475, 250, 350, 300)  # Positionner la fenetre à 475 250 avec comme dimension 350 * 300
-        self.setWindowFlag(QtCore.Qt.WindowType.WindowMaximizeButtonHint, False) #Désactiver pleine écran
+        self.setWindowFlag(QtCore.Qt.WindowType.WindowMaximizeButtonHint, False) #Désactiver bouton pleine écran
         self.setStyleSheet("background-color: beige;") #mettre couleur de fond en beige
-        self.setFont(QFont('Aldhabi', 8))
+        self.setFont(QFont('Aldhabi', 8)) #mettre style du texte
         self.client_socket=client_socket
 
         self.t=None
@@ -86,11 +87,14 @@ class PageInscription(QWidget):
         horizontal_layout = QHBoxLayout()
         horizontal_layout.addLayout(champ_image)  # Ajouter un espace élastique à gauche
         horizontal_layout.addLayout(self.layout)
-
         self.setLayout(horizontal_layout)
 
     def retour(self):
-        
+        """
+        Cette méthode est utilisée pour revenir à la page d'authentification en fermant la fenêtre actuelle en donnant comme argument la socket du client pour continuer à utiliser la même socket.
+
+        Elle est utilisé par le bouton retour.
+        """
         self.close()  # Ferme la fenêtre actuelle
         self.pageauthentification = PageAuthentification(client_socket)
         self.pageauthentification.show()
@@ -98,7 +102,18 @@ class PageInscription(QWidget):
     
     
     def validation(self):
-        # Vérification que le mot de passe est confirmé
+        """
+        Cette méthode est utilisée pour vérifier si les champs entrer dans les champs de l'inscription (mots de passe sont identiques, email correcte, ...). 
+
+        Si les champs sont validés, ils sont envoyés au server sous forme de dictionnaire.
+
+        Une fois envoyer, il attends une réponse du serveur qui lui indique si l'inscription est validé.
+
+        Sortie:
+            Inscription approuvé: L'inscription est bon
+
+            Identifant existe: L'indentifant est déjà utiliser
+        """
         if self.champ_mdp.text() != self.champ_mdp2.text():
             QMessageBox.warning(self, 'Erreur', 'Les mots de passe ne correspondent pas.')
             return
@@ -133,6 +148,12 @@ class PageInscription(QWidget):
         
 
 class PageAuthentification(QWidget):
+    """
+        Cette classe est la page d'authentification de l'application de messagerie.
+
+        C'est ici où doit s'identifier afin d'accéder à l'interface du serveur.
+
+    """
     global b
     b=0
     global client_socket, server_host, server_port
@@ -194,6 +215,16 @@ class PageAuthentification(QWidget):
         self.setLayout(horizontal_layout)
 
     def login(self):
+        """
+        Cette méthode est utilisé pour s'authentifier. Il envoie un dictionnaire avec les champs de la page d'inscription.
+        
+        Il attends ensuite une réponse du serveur, si les champs sont validés, il est redirigé vers la page principale de l'application avec le compte entrer par rapport au message.
+
+        Sortie:
+            Connection approuvé: L'authentification est bon
+
+            Autre: L'authentification a échoué 
+        """
         username = self.champ_nom_util.text()
         password = self.champ_mdp.text()
         data = {"commande": "connection_compte", "username": username, "password": password}
@@ -212,21 +243,39 @@ class PageAuthentification(QWidget):
     def send_messages(self, data):
         json_data = json.dumps(data)
         self.client_socket.send(json_data.encode('utf-8'))
-        
+        """
+        Cette méthode prend un dictionnaire `data` et le convertit en format JSON.
+
+        Args:
+            data (dict): Dictionnaire contenant les données à envoyer.
+
+        """
 
     def inscription(self):
         self.close()  # Ferme la fenêtre actuelle
         self.inscription_page = PageInscription(client_socket)
         self.inscription_page.show()
+        """
+        Cette méthode est utilisé pour nous rediriger vers la page d'inscrition.
+
+        """
        
 class ClientThread(QThread):
-    message_received = pyqtSignal(str)
+    """
+        Cette classe est utilisé pour faire tourner en arrière plan (thread) la socket en écoute pour que quand un message est reçu il puisse traité les informations sans pour autant bloqué les autres taches efféctués.
+
+    """
+    message_received = pyqtSignal(str) #Signal émis lorsqu'un message est reçu.
+    
 
     def __init__(self, client_socket, parent=None):
         super().__init__(parent)
-        self.client_socket = client_socket
+        self.client_socket = client_socket # Attribue le socket client pour la communication avec le serveur. Cela permet d'accéder au socket client à l'intérieur de la classe.
 
     def run(self):
+        """
+        Cette fonction est la fonction qui est utilisé par la thread, quand un message est reçu il va vérifier si b== 1 (véifier si on est dans la page principale), si oui, il va utiliser la fonction message_received avec comme argument le message
+        """
         global b
         while b == 1:  # Utilisez la condition appropriée pour votre logique
             try:
@@ -243,8 +292,11 @@ class ClientThread(QThread):
                 break
         
 class PagePrincipale(QWidget):
+    """
+    Cette classe est la page principale de l'application où l'utilisateurs peut faire différente action.
+    """
     global b
-    global client_socket, server_host, server_port
+    
     b=1
     def __init__(self, client_socket, username):
         super().__init__()
@@ -283,7 +335,7 @@ class PagePrincipale(QWidget):
         self.channel_list = QListWidget(self)
         self.channel_list.clear()
         
-        
+        #Récupération des canaux 
         data = {"commande": "recuperation_canaux", "username": self.username}
         self.send_messages(data)
 
@@ -309,16 +361,12 @@ class PagePrincipale(QWidget):
         # Zone d'affichage des messages
         self.layout_titre2=QHBoxLayout()
         
+        #Zone de message avec possibilité de scroll
         self.messages_display_widget = QWidget(self)
         self.messages_display_layout = QVBoxLayout(self.messages_display_widget)
         self.messages_display = QScrollArea(self)
         self.messages_display.setWidgetResizable(True)
         self.messages_display.setWidget(self.messages_display_widget)
-        
-
-        ################################################################################################
-        
-    
         
         self.channel_list.setCurrentItem(self.channel_list.item(0))
         self.titre_2 = QLabel("Conversation", self)
@@ -326,6 +374,7 @@ class PagePrincipale(QWidget):
         self.layout_titre2.addWidget(self.titre_2)
         self.layout_titre2.addStretch(1)
         self.all_messages_widgets = []
+
         # Zone de saisie des messages
         self.message_input_layout = QHBoxLayout()
         message_input = QLineEdit(self)
@@ -353,11 +402,16 @@ class PagePrincipale(QWidget):
         self.channel_list.currentItemChanged.connect(self.reset_txt)
     
     def reset_txt(self):
+        """
+        Cette fonction permet de reset la zone de message pour y mettre les messages de la nouvelle conversation choisi.
+
+        Pour faire cela, il supprimer tout les messages un par un ensuite il fait une requête au serveur pour qu'il lui envoie les messages de la conversation choisi.
+        
+        """
         current_item = self.channel_list.currentItem()
         if current_item is not None:
             canal = current_item.text()
-            # Faites ce que vous devez faire avec le canal
-            # Par exemple, mettre à jour le champ texte à null
+            
             
             for widget in self.all_messages_widgets:
                 self.messages_display_layout.removeWidget(widget)
@@ -373,11 +427,15 @@ class PagePrincipale(QWidget):
                 self.send_messages(data)
     
     def send_message(self):
+        """
+        Cette méthode vérifie si il y a un message, dans la zone d'envoie de texte, si c'est le cas, il vérifie si une conversation est séléctionné.
+
+        Si ces 2 conditions sont réunis, il envoie au serveur un dictionnaire le message en spécifiant sur quel canal ou à quel utilisateur il l'a envoyé puis, il l'affiche dans la zone de texte.
+
+        Et enfin il supprime ce qu'il y a dans la zone d'entrer de texte.
+        """
         message = self.message_input_layout.itemAt(0).widget().text()
         current_item = self.channel_list.currentItem()
-        
-       
-
         if message:
             if current_item is not None:
                 canal = current_item.text()
@@ -395,27 +453,30 @@ class PagePrincipale(QWidget):
                     self.messages_display_layout.addWidget(x)
                     self.all_messages_widgets.append(x)
                 self.message_input_layout.itemAt(0).widget().clear()
-    
-    def update_titre_2(self, current, previous):
-        if current is not None:
-            selected_channel = current.text()
-            self.titre_2.setText(f"{selected_channel}")
-
-    
 
     def message_recu(self, message):
+        """
+        Cette méthode est celle utilisé par la thread pour gérer les actions nécessaire quand un messsage est reçu.
+
+        D'abord, le message est convertie pour récuperer le dictionnaire.
+
+        Ensuite, il regarde la commande dans le champs "commande" et ensuite il rentre plus en détail afin d'executer les actions souhaités.
+
+        Args:
+            message: message reçu par la thread et renvoyer pour être traiter 
+        """
         decode = json.loads(message)
         if decode["commande"] == "envoi_message_canal":
             if decode["username"] != self.username and decode["destinataire"] ==  self.channel_list.currentItem().text():
                 x = QLabel(f"{decode['username']}: {decode['message']}", self)
-                self.messages_display_layout.addWidget(x)
-                self.all_messages_widgets.append(x)
+                self.messages_display_layout.addWidget(x) #ajout des messages dans la zone de texte
+                self.all_messages_widgets.append(x) #liste des messages qui est utilisé pour la suppressions de celles-ci
                 
         elif decode["commande"] == "envoi_message_prv":
             if decode["destinataire"] ==  self.username and decode["username"]==self.channel_list.currentItem().text():
                 x = QLabel(f"{decode['username']}: {decode['message']}", self)
-                self.messages_display_layout.addWidget(x)
-                self.all_messages_widgets.append(x)
+                self.messages_display_layout.addWidget(x) #ajout des messages dans la zone de texte
+                self.all_messages_widgets.append(x) #liste des messages qui est utilisé pour la suppressions de celles-ci
         
         elif decode["commande"] == "charger_msg_canal":
             print(decode)
@@ -426,12 +487,12 @@ class PagePrincipale(QWidget):
                     user_identifiant = data['user_identifiant']
                     if user_identifiant == self.username:
                         x = QLabel(f"Moi: {message_content}", self)
-                        self.messages_display_layout.addWidget(x)
-                        self.all_messages_widgets.append(x)
+                        self.messages_display_layout.addWidget(x)#ajout des messages dans la zone de texte
+                        self.all_messages_widgets.append(x) #liste des messages qui est utilisé pour la suppressions de celles-ci
                     if user_identifiant != self.username:
                         x = QLabel(f"{user_identifiant}: {message_content}", self)
-                        self.messages_display_layout.addWidget(x)
-                        self.all_messages_widgets.append(x)
+                        self.messages_display_layout.addWidget(x)#ajout des messages dans la zone de texte
+                        self.all_messages_widgets.append(x) #liste des messages qui est utilisé pour la suppressions de celles-ci
         
         elif decode["commande"] == "charger_msg_prv":
             if decode["username"] ==  self.username and decode["destinataire"]==self.channel_list.currentItem().text():
@@ -440,12 +501,12 @@ class PagePrincipale(QWidget):
                     user_identifiant = data['user_identifiant']
                     if user_identifiant == self.username:
                         x = QLabel(f"Moi: {message_content}", self)
-                        self.messages_display_layout.addWidget(x)
-                        self.all_messages_widgets.append(x)
+                        self.messages_display_layout.addWidget(x)#ajout des messages dans la zone de texte
+                        self.all_messages_widgets.append(x)#liste des messages qui est utilisé pour la suppressions de celles-ci
                     if user_identifiant != self.username:
                         x = QLabel(f"{user_identifiant}: {message_content}", self)
-                        self.messages_display_layout.addWidget(x)
-                        self.all_messages_widgets.append(x)
+                        self.messages_display_layout.addWidget(x)#ajout des messages dans la zone de texte
+                        self.all_messages_widgets.append(x)#liste des messages qui est utilisé pour la suppressions de celles-ci
         
         elif decode["commande"] == "recuperation_canaux":
             self.channel_list.clear()
@@ -467,7 +528,7 @@ class PagePrincipale(QWidget):
             else:
                 QMessageBox.warning(self, 'Erreur', 'Une erreur imprévu est survenue.')
         elif decode["commande"] == "recuperation_demande1":
-            dialog = ListSuppr(decode["data"], self.client_socket, self.username)
+            dialog = ListSuppr(decode["data"], self.client_socket, self.username) # Ouverture d'une fenetre pour selectionner et supprimer un canal si besoin
             dialog.exec()
             self.channel_list.clear()
             data = {"commande": "recuperation_canaux", "username": self.username}
@@ -491,10 +552,13 @@ class PagePrincipale(QWidget):
                 QMessageBox.warning(self, 'Info', 'Le serveur va s\'arreter')
                 time.sleep(5)
                 self.close()    
-        
-
 
     def update_channel_list(self):
+        """
+        Cette méthode est utilisé pour mettre à jour la liste des canaux ou des utilisateurs selon celui qui a été sélectionner.
+
+        Une requêtes est envoyé au serveur puis traité par la thread.
+        """
         selected_mode = self.choix.currentText()
 
         if selected_mode == 'Canaux':
@@ -505,8 +569,14 @@ class PagePrincipale(QWidget):
             data = {"commande": "recuperation_util", "username": self.username}
             self.send_messages(data)
 
-
     def add_channel(self):
+        """
+        Cette méthode est utilisé pour ouvrir la fenêtre "Canal" qui va nous permettre de rajouter un canal.
+
+        Une fois la fenêtre ouverte, on rentre un texte qui est récupéreé par cette méthode.
+        
+        Il va ensuite envoyé une demande au serveur qui va prendre en compte ou non notre demande.
+        """
         dialog = Canal()
         result = dialog.exec()
         # Récupérer le nom du canal à partir de la boîte de dialogue
@@ -518,22 +588,29 @@ class PagePrincipale(QWidget):
             data = {"commande": "recuperation_canaux", "username": self.username}
             self.send_messages(data)
             
-        
-
     def supprimer_channel(self):
+        """
+        Cette méthode permet d'envoyer une requête au serveur pour récuper la liste des canaux où l'on est membre et ceux auquel on a fait une demande. 
+
+        Il ouvre ensuite une fenêtre après que la thread reçoit la réponse pour pouvoir supprimer un si besoin.
+        """
         data = {"commande": "recuperation_demande1", "username": self.username}
         self.send_messages(data)
         
-        
-        
-
-    
     def show_list(self):
+        """
+        Cette méthode permet d'envoyer une requête au serveur pour récuper la liste des canaux où l'on est en attente de confirmation. 
+
+        Il ouvre ensuite une fenêtre après que la thread reçoit la réponse pour pouvoir voir celles-ci.
+        """
         data = {"commande": "recuperation_demande2", "username": self.username}
         self.send_messages(data)
         
 
     def deconnection(self):
+        """
+        Cette méthode permet de nous déconnecter et de nous diriger vers la page d'authentification.
+        """
         global b
         b=0
         self.close()  # Ferme la fenêtre actuelle
@@ -541,10 +618,22 @@ class PagePrincipale(QWidget):
         self.main.show()
 
     def send_messages(self, data):
+        """
+        Cette méthode prend un dictionnaire `data` et le convertit en format JSON.
+
+        Args:
+            data (dict): Dictionnaire contenant les données à envoyer.
+
+        """
         json_data = json.dumps(data)
         self.client_socket.send(json_data.encode('utf-8'))
     
 class ListDemande1(QDialog):
+    """
+    C'est une classe qui ouvre une fenêtre avec une liste des canaux demander afin de les visualiser.
+
+    Sortie: nom du canal
+    """
     def __init__(self, items):
         super().__init__()
         self.setWindowTitle("Liste des canaux en attente")
@@ -557,6 +646,11 @@ class ListDemande1(QDialog):
         layout.addWidget(self.list_widget)
         
 class ListSuppr(QDialog):
+    """
+    C'est une classe qui ouvre une fenêtre avec une liste des canaux dans lequel on est et les canaux demander afin de pouvoir les supprimer.
+
+    Sortie: nom du canal
+    """
     def __init__(self, items, client_socket, username):
         super().__init__()
         self.setWindowTitle("Suppression canaux")
@@ -573,7 +667,11 @@ class ListSuppr(QDialog):
         layout.addWidget(self.suppression)
         
 
-    def supprimer_channel(self, o):
+    def supprimer_channel(self):
+        """
+        C'est une méthode qui envoie l'élement choisi dans la liste au serveur pour que celui qui soit supprimer de la liste des canaux de l'utilisateur.
+
+        """
         selected_item = self.list_widget.currentItem()
         if selected_item:
             data = {"commande": "supprimer_canal", "username": self.username, "canal": selected_item.text()}
@@ -587,6 +685,11 @@ class ListSuppr(QDialog):
         self.client_socket.send(json_data.encode('utf-8'))
 
 class Canal(QDialog):
+    """
+    C'est une classe qui ouvre une fenêtre avec une zone de texte pour mettre le nom du canal auquel on veut accéder.
+
+    Sortie: nom du canal
+    """
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Ajout canaux")
@@ -603,27 +706,6 @@ class Canal(QDialog):
 
     def get_channel_name(self):
         return self.channel_name_input.text()
-
-
-class ami(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Ajouter utilisateur")
-        
-        # Création des widgets
-        self.util_name_input = QLineEdit(self)
-        self.validate_button = QPushButton("Valider", self)
-        self.validate_button.clicked.connect(self.accept)
-
-        # Mise en page de la boîte de dialogue
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.util_name_input)
-        layout.addWidget(self.validate_button)
-
-    def get_util_name(self):
-        return self.util_name_input.text()
-    
-
 
 if __name__ == '__main__':
     b=1

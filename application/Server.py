@@ -14,16 +14,18 @@ config = {
 class ServeurMessagerie:
     global z
     def __init__(self, host, port):
-        self.host = host
-        self.port = port
-        self.conn = mysql.connector.connect(**config)
+        self.host = host # ip 
+        self.port = port # Port
+        self.conn = mysql.connector.connect(**config) # Connection à la base de donnée
         self.cursor = self.conn.cursor()
         
         a=0
         while a==0:
-            x=input("Entrer votre identifiant: ")
+            # demande authentification
+            x=input("Entrer votre identifiant: ") 
             y=input("Entrer votre mot de passe: ")
-            query = f"SELECT * FROM admin WHERE id = '{x}' AND mdp = '{y}';"
+            # vérifier si le compte admin existe
+            query = f"SELECT * FROM admin WHERE id = '{x}' AND mdp = '{y}';" 
             self.cursor.execute(query)
             result = self.cursor.fetchone()
             if result:
@@ -32,14 +34,19 @@ class ServeurMessagerie:
             else:
                 print("Identifiants ou mdp incorrects. Connexion échouée.")
 
-        self.clients = []
+        self.clients = [] # liste des clients connectés
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen(5)
+        self.server_socket.bind((self.host, self.port))#Lie le socket à une adresse et un port.
+        self.server_socket.listen(5) # definition de nombre de connection maximum
         
         
 
     def accept_clients(self):
+        """
+        Methode qui accepte une connection quand un client essaye de se connecter à celui-ci. 
+        
+        Il lance alors une thread d'écoute pour chaque client. 
+        """
         while z:
             try:
                 client_socket, client_address = self.server_socket.accept()
@@ -50,13 +57,24 @@ class ServeurMessagerie:
             client_thread.start()
             client_thread2 = threading.Thread(target=self.cmd, args=(client_socket, client_address))
             client_thread2.start()
-            self.clients.append((client_socket, client_address))
+            self.clients.append((client_socket, client_address)) # ajout de la connection dans la liste
 
     def handle_client(self, client_socket, client_address):
+        '''
+        Cette méthode permet de récuperer le message envoyer par le client pour ensuite le traiter.
+
+        Il vérifie ensuite le champs commande pour voir ce qui est demander.
+
+        Ensuite il regarde les autres champs pour avoir des informations sur les données souhaiter.
+
+        Puis les actions sur la base de données sont effectués.
+
+        Et enfin ils sont envoyés aux clients.
+        '''
         try:
             while z:
                 
-                message = client_socket.recv(1024).decode('utf-8')
+                message = client_socket.recv(1024).decode('utf-8') # reçoit message
                 
                 decode= self.receive_messages(message)
                 if not decode:
@@ -104,7 +122,7 @@ class ServeurMessagerie:
                         insert_query = f"INSERT INTO Utilisateurs (identifiant, alias, mot_de_passe, email, status) VALUES ('{username}', '{alias}', '{password}', '{email}', {status});"
                         self.cursor.execute(insert_query)
                         self.conn.commit()
-                        insert_user_channel_query = f"INSERT INTO Utilisateur_Salons (utilisateur_id, salon_nom) VALUES ('{username}', 'General');"
+                        insert_user_channel_query = f"INSERT INTO Utilisateur_Salons (utilisateur_id, salon_nom) VALUES ('{username}', 'General');" # ajout dans le canal général par défaut
                         self.cursor.execute(insert_user_channel_query)
                         self.conn.commit()
                         message = "Inscription approuvé"
@@ -292,6 +310,17 @@ class ServeurMessagerie:
         
 
     def cmd(self, client_socket, client_address):
+        """
+        Méthode qui permet de rentrer des commandes. 
+
+        Entrer "demande" pour voir les demande en attente.
+
+        Entrer "accepte demande "n° demande" " pour accepter
+
+        Entrer "reufse demande "n° demande" " pour refuser
+
+        Entrer "kill" pour arreter le serveur et notifier les clients
+        """
         global z
         while True:
             message = input("Entrez votre message (ou 'exit' pour quitter) : ")
@@ -299,14 +328,16 @@ class ServeurMessagerie:
             match2 = re.match(r'^kick\s+(\w+)$', message)
             match3 = re.match(r'^kill$', message)
             match4 = re.match(r'accepte demande (\d+)', message)
-            match5 = re.match(r'accepte demande (\d+)', message)
+            match5 = re.match(r'refuse demande (\d+)', message)
             if match:
                 # Si le message correspond au motif, extraire le nom d'utilisateur
-                nom_utilisateur = match.group(1)
-                print(f"Commande de ban pour l'utilisateur : {nom_utilisateur}")
+                query = f"UPDATE Utilisateurs SET ban = CURRENT_TIMESTAMP WHERE identifiant = '{match.group(1)}';"
+                self.cursor.execute(query)
+                self.conn.commit()
             elif match2:
-                nom_utilisateur = match2.group(1)
-                print("Commande non reconnue.")
+                query = f"UPDATE Utilisateurs SET ban = CURRENT_TIMESTAMP WHERE identifiant = '{match.group(1)}';"
+                self.cursor.execute(query)
+                self.conn.commit()
             
             elif message == "demande":
                 query = f"SELECT id, utilisateur_id, salon_nom FROM demande_salon;"
@@ -361,6 +392,9 @@ class ServeurMessagerie:
                         
 
     def receive_messages(self, data):
+        """
+        Méthode qui permet de décoder le message reçu en format json.
+        """
         decoded_data = json.loads(data)
         return decoded_data
     
