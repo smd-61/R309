@@ -323,7 +323,7 @@ class ServeurMessagerie:
         """
         global z
         while True:
-            message = input("Entrez votre message (ou 'exit' pour quitter) : ")
+            message = input("Entrez votre commande: ")
             match = re.match(r'^ban\s+(\w+)$', message)
             match2 = re.match(r'^kick\s+(\w+)$', message)
             match3 = re.match(r'^kill$', message)
